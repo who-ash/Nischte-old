@@ -6,10 +6,13 @@ import mongoose from "mongoose";
 export const createOffer = async (req, res) => {
   try {
     const { shopId, itemId, offerType, offerDescription, _isActive } = req.body;
+    console.log("Received Request Body:", req.body);
 
     let isOfferExist = await Offer.findOne({ shopId, itemId });
+    console.log("Existing Offer Found:", isOfferExist);
 
     if (isOfferExist) {
+      console.log("Updating Existing Offer...");
       const newOffer = {
         offerType: { name: offerType.name },
         offerDescription: {
@@ -26,16 +29,22 @@ export const createOffer = async (req, res) => {
 
       isOfferExist.offers.push(newOffer);
       const savedOffer = await isOfferExist.save();
+      console.log("Updated Offer Saved:", savedOffer);
+
       const newSubDocumentId =
         savedOffer.offers[savedOffer.offers.length - 1]._id;
+      console.log("New Offer Subdocument ID:", newSubDocumentId);
 
-      await Menu.updateOne(
+      const menuUpdateResult = await Menu.updateOne(
         { shopId, "items._id": itemId },
         { $push: { "items.$.offerId": newSubDocumentId } }
       );
 
+      console.log("Menu Update Result:", menuUpdateResult);
+
       return res.status(200).json(savedOffer);
     } else {
+      console.log("Creating New Offer Document...");
       const newOfferDocument = new Offer({
         shopId,
         itemId,
@@ -57,16 +66,22 @@ export const createOffer = async (req, res) => {
       });
 
       const savedNewOffer = await newOfferDocument.save();
-      const newSubDocumentId = savedNewOffer.offers[0]._id;
+      console.log("New Offer Document Saved:", savedNewOffer);
 
-      await Menu.updateOne(
+      const newSubDocumentId = savedNewOffer.offers[0]._id;
+      console.log("New Offer Subdocument ID:", newSubDocumentId);
+
+      const menuUpdateResult = await Menu.updateOne(
         { shopId, "items._id": itemId },
         { $push: { "items.$.offerId": newSubDocumentId } }
       );
 
+      console.log("Menu Update Result:", menuUpdateResult);
+
       return res.status(201).json(savedNewOffer);
     }
   } catch (error) {
+    console.error("Error in creating offer:", error.message);
     return res.status(500).json({
       message: "Not able to create offer",
       error: error.message,
@@ -74,12 +89,13 @@ export const createOffer = async (req, res) => {
   }
 };
 
+
 export const getAllOffers = async (req, res) => {
   try {
     const shopId = req.params.shopId;
     const itemId = req.params.itemId;
     const offers = await Offer.find({
-      shopId,
+      shopId, 
       itemId,
     });
     res.status(200).json({

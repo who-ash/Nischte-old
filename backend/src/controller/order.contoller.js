@@ -12,6 +12,8 @@ export const createOrder = async (req, res) => {
       totalSavings,
     } = req.body;
 
+    console.log("req body: ", req.body);
+
     const existingOrder = await Order.findOne({ transactionId });
     if (existingOrder) {
       return res.status(400).json({
