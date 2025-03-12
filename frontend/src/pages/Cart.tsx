@@ -4,17 +4,74 @@ import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { FaMinus, FaPlus } from "react-icons/fa";
+import { ImCancelCircle } from "react-icons/im";
 import axios from "axios";
 import { API } from "@/utils/api";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { SkeletonGrid } from "@/components/SkeletonGrid";
-import { ImCancelCircle } from "react-icons/im";
 import { Link } from "react-router-dom";
+
+// Skeleton Components
+const CartItemSkeleton = () => (
+  <Card className="p-4">
+    <div className="flex items-start gap-4">
+      <Skeleton className="w-20 h-20 rounded" />
+      <div className="flex-grow">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-6 w-32 mb-2" />
+          <Skeleton className="h-6 w-6" />
+        </div>
+        <Skeleton className="h-6 w-20 mb-2" />
+        <div className="flex items-center gap-2 mt-2">
+          <Skeleton className="h-9 w-9" />
+          <Skeleton className="h-9 w-20" />
+          <Skeleton className="h-9 w-9" />
+        </div>
+      </div>
+    </div>
+  </Card>
+);
+
+const OfferSkeleton = () => (
+  <Card className="p-4 min-h-[100px]"> {/* Adjust height based on content */}
+    <div className="flex items-center space-x-2">
+      <Skeleton className="h-4 w-4 rounded-full" />
+      <div className="flex-grow">
+        <Skeleton className="h-5 w-32 mb-2" />
+        <Skeleton className="h-4 w-48 mb-1" />
+        <Skeleton className="h-4 w-40" />
+      </div>
+    </div>
+  </Card>
+);
+
+
+const OrderSummarySkeleton = () => (
+  <Card className="p-4 sticky top-4">
+    <Skeleton className="h-6 w-32 mb-4" />
+    {[1, 2, 3].map((i) => (
+      <div key={i} className="mb-2">
+        <div className="flex justify-between">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+        <Skeleton className="h-3 w-32 mt-1" />
+      </div>
+    ))}
+    <div className="border-t mt-4 pt-4">
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-6 w-24" />
+        <Skeleton className="h-6 w-24" />
+      </div>
+    </div>
+    <Skeleton className="h-9 w-full mt-4" />
+  </Card>
+);
 
 declare global {
   interface Window {
@@ -34,7 +91,8 @@ export const Cart = () => {
   const [selectedOffers, setSelectedOffers] = useState<{
     [key: string]: string;
   }>({});
-  const [isLoadingOffers, setIsLoadingOffers] = useState(false);
+  const [isLoadingOffers, setIsLoadingOffers] = useState(true);
+  const [isLoadingCart, setIsLoadingCart] = useState(true);
 
   const handleQuantityChange = (itemId: string, value: string) => {
     setQuantities({ ...quantities, [itemId]: value });
@@ -79,7 +137,6 @@ export const Cart = () => {
   const fetchOfferDetails = async () => {
     setIsLoadingOffers(true);
     try {
-
       const token = await getToken();
       const offerIds = Array.from(
         new Set(
@@ -88,7 +145,6 @@ export const Cart = () => {
             .flatMap((item) => item.offerId)
         )
       );
-      console.log(state.items)
 
       if (offerIds.length === 0) {
         setApplicableOffers([]);
@@ -100,13 +156,13 @@ export const Cart = () => {
         `${API}/api/v1/offer/eligible`,
         {
           offerIds: offerIds,
-        }, {
+        },
+        {
           headers: {
-            "Authorization": `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
-      console.log("eligibe offers: ", eligibleResponse);
 
       if (eligibleResponse.data.success) {
         const eligibleOffers = eligibleResponse.data.applicableOffers;
@@ -122,7 +178,6 @@ export const Cart = () => {
               params: { offerId: eligibleOfferIds },
             }
           );
-          console.log("offers details: ", detailsResponse);
           if (detailsResponse.data.offers) {
             setOfferDetails(detailsResponse.data.offers);
           }
@@ -176,6 +231,7 @@ export const Cart = () => {
           };
         }
       | undefined;
+
     if (!selectedOffer)
       return {
         originalPrice: item.price * item.quantity,
@@ -284,19 +340,31 @@ export const Cart = () => {
       });
   
       const response = await axios.get(
-        `${API}/api/v1/payment/initiate?data=${encodeURIComponent(plainData)}`, {
+        `${API}/api/v1/payment/initiate?data=${encodeURIComponent(plainData)}`,
+        {
           headers: {
-            "Authorization": `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
   
       if (response.data.success) {
-        localStorage.setItem('currentTransactionId', response.data.merchantTransactionId);
-        localStorage.setItem('paymentData', response.data.data);
-        console.log("response data: payement: ", response.data)
+        const paymentInfo = {
+          transactionId: response.data.merchantTransactionId,
+          paymentData: response.data.data,
+          timestamp: Date.now()
+        };
+        
+        // Store as a single item
+        localStorage.setItem('paymentInfo', JSON.stringify(paymentInfo));
+        
+        let redirectUrl = response.data.redirectUrl;
+        if (redirectUrl && !redirectUrl.startsWith('http')) {
+          redirectUrl = `https://${redirectUrl}`;
+        }
         window.location.href = response.data.redirectUrl;
-      } else {
+
+      }else {
         localStorage.removeItem('currentTransactionId');
         toast.error("Payment initiation failed");
       }
@@ -305,16 +373,19 @@ export const Cart = () => {
       toast.error("Checkout failed");
     }
   };
-  
 
   const handleItemCancel = (itemId: string) => {
     dispatch({
       type: "CLEAR_ITEM",
-      payload: itemId
-    })
-  }
+      payload: itemId,
+    });
+  };
 
   useEffect(() => {
+    // Simulate loading state for cart items
+    setIsLoadingCart(true);
+    setTimeout(() => setIsLoadingCart(false), 200);
+    
     fetchOfferDetails();
   }, [state.items]);
 
@@ -328,13 +399,18 @@ export const Cart = () => {
           <div className="flex-grow space-y-8">
             {/* Cart Items */}
             <div className="space-y-4">
-              {state.items.length === 0 ? (
-                 <div className="flex  items-center gap-x-2">
-                 <p className="text-lg">Your cart is empty.</p>
-                 <Link to="/shops" className="text-gray-500">
-                   Continue Shopping
-                 </Link>
-               </div>
+              {isLoadingCart ? (
+                // Show skeletons while loading
+                Array(3)
+                  .fill(0)
+                  .map((_, index) => <CartItemSkeleton key={index} />)
+              ) : state.items.length === 0 ? (
+                <div className="flex items-center gap-x-2">
+                  <p className="text-lg">Your cart is empty.</p>
+                  <Link to="/shops" className="text-gray-500">
+                    Continue Shopping
+                  </Link>
+                </div>
               ) : (
                 state.items.map((item) => (
                   <Card key={item._id} className="p-4">
@@ -347,7 +423,10 @@ export const Cart = () => {
                       <div className="flex-grow">
                         <div className="flex justify-between items-center">
                           <h3 className="font-bold">{item.itemName}</h3>
-                          <ImCancelCircle onClick={() => handleItemCancel(item._id)}/>
+                          <ImCancelCircle
+                            className="cursor-pointer"
+                            onClick={() => handleItemCancel(item._id)}
+                          />
                         </div>
                         <p className="text-lg">₹{item.price}</p>
                         <div className="flex items-center gap-2 mt-2">
@@ -384,12 +463,12 @@ export const Cart = () => {
                     </div>
                   </Card>
                 ))
-              ) }
+              )}
             </div>
 
             {/* Offers Section */}
             {offerDetails.length > 0 && (
-              <div className="space-y-4 ">
+              <div className="space-y-4">
                 <h2 className="text-2xl font-bold mb-4">Available Offers</h2>
                 <RadioGroup
                   value={Object.values(selectedOffers)[0] || ""}
@@ -404,54 +483,59 @@ export const Cart = () => {
                     if (itemId) handleOfferSelection(itemId, value);
                   }}
                 >
-                  <div className="space-y-4 ">
-                    {offerDetails.map(
-                      (offer: {
-                        _id: string;
-                        offerDescription: {
-                          discountRate?: number;
-                          plusOffers?: number;
-                          description: string;
-                        };
-                        offerType: { name: string };
-                      }) => {
-                        const applicableItems = state.items.filter((item) =>
-                          item.offerId?.includes(offer._id)
-                        );
+                  <div className="space-y-4">
+                    {isLoadingOffers ? (
+                      // Show offer skeletons while loading
+                      Array(3)
+                        .fill(0)
+                        .map((_, index) => <OfferSkeleton key={index} />)
+                    ) : (
+                      offerDetails.map(
+                        (offer: {
+                          _id: string;
+                          offerDescription: {
+                            discountRate?: number;
+                            plusOffers?: number;
+                            description: string;
+                          };
+                          offerType: { name: string };
+                        }) => {
+                          const applicableItems = state.items.filter((item) =>
+                            item.offerId?.includes(offer._id)
+                          );
 
-                        return isLoadingOffers ? (
-                          <SkeletonGrid count={1} />
-                        ) : (
-                          <Card key={offer._id} className="p-4 bg-green-200">
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem
-                                value={offer._id}
-                                id={offer._id}
-                              />
-                              <Label htmlFor={offer._id}>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">
-                                    {offer.offerType.name}
-                                  </span>
-                                  <span className="text-sm text-gray-600">
-                                    Applicable on:{" "}
-                                    {applicableItems
-                                      .map((item) => item.itemName)
-                                      .join(", ")}
-                                  </span>
-                                  <span className="text-sm text-green-600">
-                                    {offer.offerDescription.description}
-                                    {offer.offerDescription.plusOffers &&
-                                      ` (Get ${offer.offerDescription.plusOffers} extra)`}
-                                    {offer.offerDescription.discountRate &&
-                                      ` (${offer.offerDescription.discountRate}% off)`}
-                                  </span>
-                                </div>
-                              </Label>
-                            </div>
-                          </Card>
-                        );
-                      }
+                          return (
+                            <Card key={offer._id} className="p-4 bg-green-200">
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem
+                                  value={offer._id}
+                                  id={offer._id}
+                                />
+                                <Label htmlFor={offer._id}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {offer.offerType.name}
+                                    </span>
+                                    <span className="text-sm text-gray-600">
+                                      Applicable on:{" "}
+                                      {applicableItems
+                                        .map((item) => item.itemName)
+                                        .join(", ")}
+                                    </span>
+                                    <span className="text-sm text-green-600">
+                                      {offer.offerDescription.description}
+                                      {offer.offerDescription.plusOffers &&
+                                        ` (Get ${offer.offerDescription.plusOffers} extra)`}
+                                      {offer.offerDescription.discountRate &&
+                                        ` (${offer.offerDescription.discountRate}% off)`}
+                                    </span>
+                                  </div>
+                                </Label>
+                              </div>
+                            </Card>
+                          );
+                        }
+                      )
                     )}
                   </div>
                 </RadioGroup>
@@ -461,53 +545,61 @@ export const Cart = () => {
 
           {/* Right Column - Order Summary */}
           <div className="lg:w-1/3">
-            <Card className="p-4 sticky top-4">
-              <h2 className="text-xl font-bold mb-4">Order Summary</h2>
-              {state.items.map((item) => {
-                const priceDetails = calculateItemPrice(item);
-                return (
-                  <div key={item._id} className="mb-2">
-                    <div className="flex justify-between text-sm">
-                      <span>
-                        {item.itemName} × {priceDetails.totalItems}
-                        {priceDetails.totalItems !== item.quantity && (
-                          <span className="text-green-600 ml-1">
-                            (Including {priceDetails.totalItems - item.quantity}{" "}
-                            free)
-                          </span>
-                        )}
-                      </span>
-                      <div>
-                        {priceDetails.savings > 0 && (
-                          <span className="line-through text-gray-500 mr-2">
-                            ₹{priceDetails.originalPrice.toFixed(2)}
-                          </span>
-                        )}
-                        <span>₹{priceDetails.finalPrice.toFixed(2)}</span>
+            {isLoadingCart ? (
+              <OrderSummarySkeleton />
+            ) : (
+              <Card className="p-4 sticky top-4">
+                <h2 className="text-xl font-bold mb-4">Order Summary</h2>
+                {state.items.map((item) => {
+                  const priceDetails = calculateItemPrice(item);
+                  return (
+                    <div key={item._id} className="mb-2">
+                      <div className="flex justify-between text-sm">
+                        <span>
+                          {item.itemName} × {priceDetails.totalItems}
+                          {priceDetails.totalItems !== item.quantity && (
+                            <span className="text-green-600 ml-1">
+                              (Including {priceDetails.totalItems - item.quantity}{" "}
+                              free)
+                            </span>
+                          )}
+                        </span>
+                        <div>
+                          {priceDetails.savings > 0 && (
+                            <span className="line-through text-gray-500 mr-2">
+                              ₹{priceDetails.originalPrice.toFixed(2)}
+                            </span>
+                          )}
+                          <span>₹{priceDetails.finalPrice.toFixed(2)}</span>
+                        </div>
                       </div>
+                      {priceDetails.appliedOffer && (
+                        <div className="text-xs text-green-600">
+                          {priceDetails.appliedOffer.offerDescription.description}
+                        </div>
+                      )}
                     </div>
-                    {priceDetails.appliedOffer && (
-                      <div className="text-xs text-green-600">
-                        {priceDetails.appliedOffer.offerDescription.description}
-                      </div>
-                    )}
+                  );
+                })}
+
+                <div className="border-t mt-4 pt-4">
+                  <div className="flex justify-between items-center">
+                    <p className="text-xl font-bold">Final Total:</p>
+                    <p className="text-xl font-bold">
+                      ₹{calculateCartTotal().toFixed(2)}
+                    </p>
                   </div>
-                );
-              })}
-
-              <div className="border-t mt-4 pt-4">
-                <div className="flex justify-between items-center">
-                  <p className="text-xl font-bold">Final Total:</p>
-                  <p className="text-xl font-bold">
-                    ₹{calculateCartTotal().toFixed(2)}
-                  </p>
                 </div>
-              </div>
 
-              <Button className="w-full mt-4" onClick={handleCheckout}>
-                Proceed to Checkout
-              </Button>
-            </Card>
+                <Button 
+                  className="w-full mt-4" 
+                  onClick={handleCheckout}
+                  disabled={state.items.length === 0}
+                >
+                  Proceed to Checkout
+                </Button>
+              </Card>
+            )}
           </div>
         </div>
       </div>

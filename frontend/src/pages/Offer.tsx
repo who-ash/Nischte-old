@@ -72,11 +72,12 @@ export const Offer: FC = () => {
 
     try {
       const token = await getToken();
-      await axios.post(`${API}/api/v1/offer`, offerData, {
+      const response = await axios.post(`${API}/api/v1/offer`, offerData, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
       });
+      console.log("created offer: ", response.data);
       resetForm();
       fetchOffer();
     } catch (error) {
@@ -104,12 +105,17 @@ export const Offer: FC = () => {
 
   const handleDeleteOffer = async (offerId: string): Promise<void> => {
     try {
+      const token = await getToken();
       console.log("hehe");
       const data = {
         shopId,
         itemId: menuId,
       };
-      await axios.delete(`${API}/api/v1/offer/${offerId}`, { data });
+      await axios.delete(`${API}/api/v1/offer/${offerId}`, { data, 
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+       });
       toast.success("Offer deleted successfully!");
       setOffer((prevOffers) =>
         prevOffers.filter((offer) => offer._id !== offerId)

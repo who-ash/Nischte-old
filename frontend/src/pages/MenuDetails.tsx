@@ -12,10 +12,10 @@ import { Button } from "@/components/ui/button";
 
 interface Item {
   _id: string;
-  itemName: string;
+  itemName: string;   
   itemDescription: string;
   picture: string;
-  offerId?: string;
+  offerId?: string[];
   price: number;
   shopId: string;
 }
@@ -37,6 +37,8 @@ export const MenuDetails: FC = () => {
         `${API}/api/v1/shop/${shopId}/menu/${menuId}`
       );
       console.log("res for items: ", res.data);
+      console.log("Offer IDs in response:", res.data.offerId); // Add this log
+   
       setItem(res.data);
     } catch (error) {
       console.log("Failed to get the item details");
@@ -49,6 +51,8 @@ export const MenuDetails: FC = () => {
     try {
       setLoading(true);
       const res = await axios.get(`${API}/api/v1/shop/${shopId}/menu`);
+      console.log("here at shopitems",res.data);
+      console.log("Shop items response:", res.data[0].items);
       setShopItems(res.data[0].items);
     } catch (error) {
       console.log("Failed to fetch the items of shop");
@@ -71,18 +75,34 @@ export const MenuDetails: FC = () => {
 
   const handleAddToCart = (itemData: any, quantity: number) => {
     try {
+      const fullItemData = item && (item._id === itemData._id || item._id === itemData.id) ? item : 
+                          shopItems.find(i => i._id === itemData._id || i._id === itemData.id) || itemData;
+      
+      console.log("Full item data:", fullItemData);
+      
+      const cartItem = {
+        _id: fullItemData.id || fullItemData._id, 
+        itemName: fullItemData.itemName || fullItemData.name,
+        price: fullItemData.price,
+        picture: fullItemData.picture || fullItemData.image,
+        offerId: Array.isArray(fullItemData.offerId) ? fullItemData.offerId : 
+                 Array.isArray(fullItemData.offerIds) ? fullItemData.offerIds : [], 
+        shopId: fullItemData.shopId || itemData.shopId,
+        itemDescription: fullItemData.itemDescription || "",
+        item: fullItemData.id || fullItemData._id, 
+        quantity: 1
+      };
+  
+      console.log("Cart item being added:", cartItem);
+  
       for (let i = 0; i < quantity; i++) {
         dispatch({
           type: "ADD_TO_CART",
-          payload: {
-            ...itemData,
-            itemName: itemData.name,
-            _id: itemData.id,
-            shopId: itemData.shopId,
-          },
+          payload: cartItem
         });
       }
-      toast.success(`${quantity} x ${itemData.name} added to your cart`, {
+      
+      toast.success(`${quantity} x ${cartItem.itemName} added to your cart`, {
         duration: 2000,
       });
     } catch (error) {

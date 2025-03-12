@@ -18,6 +18,7 @@ interface Item {
   itemDescription: string;
   price: number;
   picture: string;
+  offerId: string[]; 
   shopId: string;
   item: string;
 }
@@ -52,7 +53,7 @@ export const Items: FC = () => {
       const res = await axios.get<ItemResponse>(
         `${API}/api/v1/shop/menu?page=${currentPage}&limit=${itemsPerPage}&search=${search}`
       );
-
+      console.log("here: ggg ", res.data);
       if (currentPage === 1) {
         setItems(res.data.items);
       } else {
@@ -100,18 +101,28 @@ export const Items: FC = () => {
   };
 
   const handleAddToCart = (item: any, quantity: number) => {
-    // Transform the item to match your cart structure
+    // Find the original item data from the items state
+    const originalItem = items.find(i => i._id === item._id);
+    
+    if (!originalItem) {
+      console.error('Item not found');
+      return;
+    }
+  
     const cartItem = {
-      _id: item.id,
-      itemName: item.name,
-      price: item.price,
-      picture: item.image,
-      shopId: item.shopId,
-      itemDescription: '', 
-      item: item.id, 
+      _id: originalItem._id,
+      itemName: originalItem.itemName,
+      price: originalItem.price,
+      picture: originalItem.picture,
+      offerId: originalItem.offerId, // This will now have the correct offerId array
+      shopId: originalItem.shopId,
+      itemDescription: originalItem.itemDescription,
+      item: originalItem._id,
+      quantity: 1
     };
-
+  
     for (let i = 0; i < quantity; i++) {
+      console.log("items at items: ", cartItem);
       dispatch({ type: "ADD_TO_CART", payload: cartItem });
     }
   };
@@ -158,9 +169,10 @@ export const Items: FC = () => {
                       name={item.itemName}
                       image={item.picture}
                       price={item.price}
+                      offerId={item.offerId} 
                       currency="₹"
                       onItemClick={handleItemClick}
-                      onAddToCart={handleAddToCart}
+                      onAddToCart={(_, quantity) => handleAddToCart(item, quantity)} // Modified this line
                     />
                   ))
                 )}

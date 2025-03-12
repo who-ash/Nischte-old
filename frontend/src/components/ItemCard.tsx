@@ -16,6 +16,7 @@ interface ItemCardProps {
   isManagePage?: boolean;
   description ?: string;
   isOwner ?: boolean;
+  offerId?: string[];
   onUpdate?: (menuId: string) => void
   onOffer?: (menuId: string) => Promise<void>
   onDelete?: (itemId: string) => Promise<void>
@@ -32,6 +33,7 @@ export function ItemCard({
   currency,
   isManagePage,
   isOwner,
+  offerId,
   onItemClick,
   onAddToCart,
   onUpdate,
@@ -62,7 +64,15 @@ export function ItemCard({
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onAddToCart({ id, shopId, name, price, image }, quantity);
+    const itemData = {
+      id,
+      shopId,
+      name,
+      price,
+      image,
+      offerId 
+    };
+    onAddToCart(itemData, quantity);
     toast.success(`${quantity} x ${name} added to your cart`, { duration: 2000 });
   };
 

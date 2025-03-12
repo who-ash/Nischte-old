@@ -27,6 +27,7 @@ interface Item {
   price: number;
   picture: string;
   shopId: string;
+  offerId: string[];
 }
 
 export const Home = () => {
@@ -82,11 +83,13 @@ export const Home = () => {
 
   const handleAddToCart = (item: any, quantity: number) => {
     try {
+      console.log("item", item);
       for (let i = 0; i < quantity; i++) {
         dispatch({
           type: "ADD_TO_CART",
           payload: { 
             ...item,
+            offerId: item.offerId,
             itemName: item.name,
             _id: item.id
           },
