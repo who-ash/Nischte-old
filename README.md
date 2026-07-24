@@ -1,4 +1,4 @@
-# NISCHTE
+# NISCHTE - Loyality App
 
 Nischte is a loyalty platform built on fostering loyalty between customers and business owners. It creates a win-win scenario, where customers receive discounts on their orders and owners benefit from having loyal customers. Business owners have the ability to manage and run their own loyalty programs.
 
