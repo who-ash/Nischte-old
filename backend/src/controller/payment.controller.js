@@ -7,23 +7,34 @@ import { FRONTEND_URL, PHONEPE_HOST_URL, MERCHANT_ID, SALT_KEY, SALT_INDEX } fro
 export const initiatePayment = async (req, res) => {
   try {    
     const plainData = req.query.data;
+    console.log("Received request data:", plainData);
+
     if (!plainData) {
       return res.status(400).json({ message: "Missing data" });
     }
 
-    const parsedData = JSON.parse(plainData);
+    let parsedData;
+    try {
+      parsedData = JSON.parse(plainData);
+    } catch (error) {
+      console.error("Error parsing JSON:", error);
+      return res.status(400).json({ message: "Invalid JSON format" });
+    }
+
     const { amount } = parsedData;
+    console.log("Parsed amount:", amount);
 
     const amountInPaise = Number(amount) * 100;
     if (isNaN(amountInPaise) || amountInPaise <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
     }
 
-    let merchantTransactionId = uniqid();
+    const merchantTransactionId = uniqid();
+    console.log("Generated Merchant Transaction ID:", merchantTransactionId);
 
     const tempPaymentData = {
       merchantTransactionId,
-      amount: amountInPaise
+      amount: amountInPaise,
     };
 
     const encodedData = Buffer.from(JSON.stringify(tempPaymentData)).toString('base64');
@@ -33,7 +44,7 @@ export const initiatePayment = async (req, res) => {
       merchantTransactionId,
       amount: amountInPaise,
       redirectUrl: `${FRONTEND_URL}/payment/callback?data=${encodedData}`,
-      redirectMode: "REDIRECT",
+      redirectMode: "POST",
       paymentInstrument: {
         type: "PAY_PAGE"
       }
@@ -46,37 +57,61 @@ export const initiatePayment = async (req, res) => {
     let sha256_val = sha256(string);
     let xVerifyChecksum = sha256_val + "###" + SALT_INDEX;
 
-    const response = await axios.post(
-      `${PHONEPE_HOST_URL}/pg/v1/pay`,
-      { request: base64EncodedPayload },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "X-VERIFY": xVerifyChecksum,
-          accept: "application/json",
-        },
-      }
-    );
+    console.log("Sending payment request to PhonePe...");
+
+    let response;
+    try {
+      response = await axios.post(
+        `${PHONEPE_HOST_URL}/pg/v1/pay`,
+        { request: base64EncodedPayload },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "X-VERIFY": xVerifyChecksum,
+            accept: "application/json",
+          },
+        }
+      );
+
+      // console.log("huh:::::", response.data.data.instrumentResponse.redirectInfo.url,)
+      // console.log({
+      //   url: `${PHONEPE_HOST_URL}/pg/v1/pay`,
+      //   payload: normalPayLoad,
+      //   base64Payload: base64EncodedPayload,
+      //   checksumString: string,
+      //   computedChecksum: sha256_val,
+      //   finalHeader: xVerifyChecksum
+      // });
+    } catch (axiosError) {
+      console.error("Axios request error:", axiosError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to connect to PhonePe API",
+        error: axiosError.message
+      });
+    }
+
+    console.log("PhonePe API Response:", response.data.data.instrumentResponse);
 
     if (response.data.success) {
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         redirectUrl: response.data.data.instrumentResponse.redirectInfo.url,
         merchantTransactionId,
         data: encodedData
       });
     } else {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Payment initiation failed",
         error: response.data
       });
     }
   } catch (error) {
-    console.error("Payment initiation error:", error);
-    res.status(500).json({
+    console.error("Unexpected payment initiation error:", error);
+    return res.status(500).json({
       success: false,
-      message: "Failed to initiate the payment",
+      message: "An unexpected error occurred while initiating payment",
       error: error.message
     });
   }
@@ -85,15 +120,7 @@ export const initiatePayment = async (req, res) => {
 export const validatePayment = async (req, res) => {
   try {
     const { merchantTransactionId } = req.params;
-
-    if (!merchantTransactionId) {
-      return res.status(400).json({ 
-        success: false,
-        message: "Invalid transaction ID or missing data" 
-      });
-    }
-
-    console.log(`Validating Payment for Transaction ID: ${merchantTransactionId}`);
+    console.log("Validating Payment for Transaction ID:", merchantTransactionId);
 
     const statusUrl = `${PHONEPE_HOST_URL}/pg/v1/status/${MERCHANT_ID}/${merchantTransactionId}`;
     const string = `/pg/v1/status/${MERCHANT_ID}/${merchantTransactionId}${SALT_KEY}`;
@@ -109,29 +136,45 @@ export const validatePayment = async (req, res) => {
       },
     });
 
-    if (response.data.code?.toUpperCase() === "PAYMENT_SUCCESS") {
-      const paymentData = response.data.data;
+    switch(response.data.code) {
+      case "PAYMENT_SUCCESS":
+        const paymentData = response.data.data;
+        const newPayment = new Payment({
+          merchantTransactionId: paymentData.merchantTransactionId,
+          transactionId: paymentData.transactionId,
+          amount: paymentData.amount,
+          state: paymentData.state,
+          paymentInstrument: paymentData.paymentInstrument,
+        });
+        const paymentDetails = await newPayment.save();
+        return res.status(200).json({
+          success: true,
+          paymentDetails
+        });
 
-      const newPayment = new Payment({
-        merchantTransactionId: paymentData.merchantTransactionId,
-        transactionId: paymentData.transactionId,
-        amount: paymentData.amount,
-        state: paymentData.state,
-        paymentInstrument: paymentData.paymentInstrument,
-      });
+      case "PAYMENT_PENDING":
+        return res.status(202).json({
+          success: true,
+          message: "Payment is pending",
+          details: response.data.data
+        });
 
-      const paymentDetails = await newPayment.save();
+      case "PAYMENT_DECLINED":
+      case "PAYMENT_ERROR":
+        return res.status(400).json({
+          success: false,
+          message: "Payment was declined or failed",
+          details: response.data.data
+        });
 
-      return res.status(200).json({
-        success: true,
-        paymentDetails
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Payment failure"
-      });
+      default:
+        return res.status(400).json({
+          success: false,
+          message: `Unknown payment status: ${response.data.code}`,
+          details: response.data.data
+        });
     }
+
   } catch (error) {
     console.error("Payment validation error:", error);
     return res.status(500).json({

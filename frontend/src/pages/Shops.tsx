@@ -2,19 +2,13 @@ import { FC, useCallback, useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { debounce } from "lodash";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
 import { API } from "@/utils/api";
 import { useNavigate } from "react-router-dom";
 import { SkeletonGrid } from "@/components/SkeletonGrid";
+import { ShopCard } from "@/components/ShopCard";
 
 interface Shop {
   _id: string;
@@ -35,11 +29,9 @@ interface ShopResponse {
 export const Shops: FC = () => {
   const [shops, setShops] = useState<Shop[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [charLimit, setCharLimit] = useState(70);
   const [page, setPage] = useState(1);
-  const [itemsPerPage] = useState(9);
+  const [itemsPerPage] = useState(12);
   const [loading, setLoading] = useState(false);
-  const [filteredShops, setFilteredShops] = useState<Shop[]>([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
@@ -69,7 +61,7 @@ export const Shops: FC = () => {
 
   const debouncedSearch = useCallback(
     debounce((searchQuery: string) => {
-      setPage(1); // Reset to first page for new search
+      setPage(1);
       fetchShops(1, searchQuery);
     }, 300),
     [fetchShops]
@@ -89,26 +81,9 @@ export const Shops: FC = () => {
     }
   };
 
-  const handleShopDetailsClick = (shopId: string) => {
+  const handleShopClick = (shopId: string) => {
     navigate(`/shop/${shopId}`);
   };
-
-  const updateCharLimit = () => {
-    const width = window.innerWidth;
-    if (width < 640) {
-      setCharLimit(70);
-    } else if (width >= 640 && width < 1024) {
-      setCharLimit(70);
-    } else {
-      setCharLimit(200);
-    }
-  };
-
-  useEffect(() => {
-    updateCharLimit();
-    window.addEventListener("resize", updateCharLimit);
-    return () => window.removeEventListener("resize", updateCharLimit);
-  }, []);
 
   useEffect(() => {
     fetchShops(1);
@@ -116,6 +91,7 @@ export const Shops: FC = () => {
       debouncedSearch.cancel();
     };
   }, [fetchShops]);
+
   const shouldShowViewMore = !searchTerm && hasMore && shops.length < total;
 
   return (
@@ -142,56 +118,20 @@ export const Shops: FC = () => {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {loading ? (
-                  <SkeletonGrid count={shops.length} />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {loading && page === 1 ? (
+                  <SkeletonGrid count={itemsPerPage} />
                 ) : (
                   shops.map((shop) => (
-                    <Card
+                    <ShopCard
                       key={shop._id}
-                      className="cursor-pointer mb-4 flex hover:shadow-lg transition-shadow"
-                      onClick={() => handleShopDetailsClick(shop._id)}
-                    >
-                      <div className="w-[40%] h-[230px] sm:h-[300px]">
-                        <div className="relative w-full h-full">
-                          <img
-                            src={shop?.picture}
-                            alt={`${shop?.shopName}`}
-                            className="absolute inset-0 w-full h-full object-cover rounded-tl-md rounded-bl-md"
-                          />
-                        </div>
-                      </div>
-                      <div className="w-[60%]">
-                        <CardHeader>
-                          <CardTitle className="text-2xl">
-                            {shop.shopName}
-                          </CardTitle>
-                          <span className="text-[10px] sm:text-sm text-gray-500">
-                            {shop._id}
-                          </span>
-                          <CardDescription>
-                            <p>
-                              <span className="text-sm">
-                                {shop.address.length > charLimit
-                                  ? `${shop.address.substring(0, charLimit)}...`
-                                  : shop.address}
-                              </span>
-                            </p>
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <p>
-                            <span className="font-bold text-[10px] sm:text-lg sm:font-semibold">
-                              Contact
-                            </span>
-                            :
-                            <span className="pl-1 text-[10px] sm:text-sm">
-                              {shop.contactNo}
-                            </span>
-                          </p>
-                        </CardContent>
-                      </div>
-                    </Card>
+                      id={shop._id}
+                      name={shop.shopName}
+                      image={shop.picture}
+                      address={shop.address}
+                      phone={shop.contactNo}
+                      onShopClick={handleShopClick}
+                    />
                   ))
                 )}
               </div>

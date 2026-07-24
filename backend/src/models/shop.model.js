@@ -31,6 +31,10 @@ const shopSchema = new Schema(
       type: String,
       required: [true, "Owner id is required"],
     },
+    fmcToken: {
+      type: String,
+      required: false
+    }
   },
   { timestamps: true }
 );

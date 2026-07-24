@@ -72,11 +72,12 @@ export const Offer: FC = () => {
 
     try {
       const token = await getToken();
-      await axios.post(`${API}/api/v1/offer`, offerData, {
+      const response = await axios.post(`${API}/api/v1/offer`, offerData, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
       });
+      console.log("created offer: ", response.data);
       resetForm();
       fetchOffer();
     } catch (error) {
@@ -98,17 +99,23 @@ export const Offer: FC = () => {
   };
 
   const handleOfferUpdate = (offerId: string): void => {
+    console.log("here at update offer")
     navigate(`/shop/${shopId}/menu/${menuId}/offer/${offerId}/update`);
   };
 
   const handleDeleteOffer = async (offerId: string): Promise<void> => {
     try {
+      const token = await getToken();
       console.log("hehe");
       const data = {
         shopId,
         itemId: menuId,
       };
-      await axios.delete(`${API}/api/v1/offer/${offerId}`, { data });
+      await axios.delete(`${API}/api/v1/offer/${offerId}`, { data, 
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+       });
       toast.success("Offer deleted successfully!");
       setOffer((prevOffers) =>
         prevOffers.filter((offer) => offer._id !== offerId)
@@ -156,13 +163,13 @@ export const Offer: FC = () => {
                       <div className="flex justify-between items-center pt-2">
                         <p className="font-semibold">{offer.offerType.name}</p>
                         <div className="space-x-2 pr-2">
-                          <Button className="p-2">
-                            <FaPen
-                              size={18}
+                          <Button className="p-2" 
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOfferUpdate(offer._id);
-                              }}
+                              }}>
+                            <FaPen
+                              size={18}
                             />
                           </Button>
                           <AlertDialog>

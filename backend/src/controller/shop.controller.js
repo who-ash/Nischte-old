@@ -91,14 +91,21 @@ export const getShop = async (req, res) => {
   try {
     const shopId = req.params.id;
     const shop = await Shop.findById(shopId);
-    res.status(200).json(shop);
+    
+    if (!shop) {
+      return res.status(404).json({ success: false, message: "Shop not found" });
+    }
+
+    res.status(200).json({ success: true, shop });
   } catch (error) {
     res.status(500).json({
+      success: false, 
       message: "Failed to get shop details",
       error: error.message,
     });
   }
 };
+
 
 export const updateShop = async (req, res) => {
   try {

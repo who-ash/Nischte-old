@@ -4,13 +4,13 @@ export interface Item {
   itemName: string;
   itemDescription: string;
   picture: string;
-  offerId?: string;
+  offerId?: string[];
   price: number;
   item: string;
 }
 
 export interface CartItem extends Item {
-  shopId: any;
+  shopId: string;
   item: any;
   quantity: number;
 }

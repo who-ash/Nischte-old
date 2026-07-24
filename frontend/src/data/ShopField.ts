@@ -19,14 +19,14 @@ export const ShopFields = [
     type: "text",
     validation: z.string().min(1, { message: "Address is required" }),
   },
-  {
-    name: "contactNo",
-    label: "Contact No",
-    type: "text",
-    validation: z
-      .string()
-      .regex(/^\d{10}$/, { message: "Contact number must be 10 digits" }),
-  },
+  // {
+  //   name: "contactNo",
+  //   label: "Contact No",
+  //   type: "text",
+  //   validation: z
+  //     .string()
+  //     .regex(/^\d{10}$/, { message: "Contact number must be 10 digits" }),
+  // },
   {
     name: "picture",
     label: "Picture",

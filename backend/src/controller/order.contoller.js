@@ -12,6 +12,8 @@ export const createOrder = async (req, res) => {
       totalSavings,
     } = req.body;
 
+    console.log("req body: ", req.body);
+
     const existingOrder = await Order.findOne({ transactionId });
     if (existingOrder) {
       return res.status(400).json({
@@ -70,19 +72,84 @@ export const getAllUserOrder = async (req, res) => {
 
 export const getOrdersForOwner = async (req, res) => {
   try {
-    const shopId = req.params.shopId;
-    const orders = await Order.find({
-      "items.shopId": shopId,
-    });
+    const { shopId } = req.params;
+    const { search } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    let query = { "items.shopId": shopId };
+    
+    if (search?.trim()) {
+      const searchTerm = search.trim();
+      
+      const idSearchPattern = searchTerm.toLowerCase();
+      
+      const allOrders = await Order.find({ "items.shopId": shopId })
+        .select('_id')
+        .lean();
+        
+      const matchingIds = allOrders
+        .filter(order => 
+          order._id.toString().slice(-8).toLowerCase().includes(idSearchPattern)
+        )
+        .map(order => order._id);
 
-    res.status(200).json(orders);
+      query = {
+        "items.shopId": shopId,
+        $or: [
+          { _id: { $in: matchingIds } },
+          { transactionId: new RegExp(searchTerm, 'i') },
+          { "items.itemName": new RegExp(searchTerm, 'i') }
+        ]
+      };
+    }
+
+    const totalOrders = await Order.countDocuments(query);
+    
+    const orders = await Order.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .select({
+        _id: 1,
+        transactionId: 1,
+        createdAt: 1,
+        status: 1,
+        cartTotal: 1,
+        totalItems: 1,
+        totalSavings: 1,
+        'items._id': 1,
+        'items.itemName': 1,
+        'items.quantity': 1,
+        'items.basePrice': 1,
+        'items.finalPrice': 1,
+        'items.appliedOffer': 1
+      })
+      .lean();
+
+    const processedOrders = orders.map(order => ({
+      ...order,
+      _id: order._id.toString()
+    }));
+      
+    res.status(200).json({
+      orders: processedOrders,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(totalOrders / limit),
+        totalOrders,
+        hasMore: page * limit < totalOrders
+      }
+    });
   } catch (error) {
+    console.error('Order fetch error:', error);
     res.status(500).json({
       message: "Failed to get the order details",
-      error: error.message,
+      error: error.message
     });
   }
 };
+
 
 export const deleteOrder = async (req, res) => {
   try {

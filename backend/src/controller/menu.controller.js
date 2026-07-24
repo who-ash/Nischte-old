@@ -138,6 +138,7 @@ export const getXitems = async (req, res) => {
           price: "$items.price",
           picture: "$items.picture",
           shopId: "$shopId",
+          offerId: "$items.offerId"
         }
       },
     ]);

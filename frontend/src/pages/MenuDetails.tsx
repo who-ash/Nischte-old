@@ -1,384 +1,228 @@
 import { API } from "@/utils/api";
 import { Navbar } from "@/components/Navbar";
 import axios from "axios";
-import { FC, TouchEvent, useEffect, useRef, useState } from "react";
+import { FC, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import useEmblaCarousel from "embla-carousel-react";
 import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
-import { FaMinus, FaPlus } from "react-icons/fa";
 import { SkeletonGrid } from "@/components/SkeletonGrid";
+import ItemBanner from "@/components/ItemBanner";
+import { ItemCard } from "@/components/ItemCard";
+import { Button } from "@/components/ui/button";
 
 interface Item {
   _id: string;
-  itemName: string;
+  itemName: string;   
   itemDescription: string;
   picture: string;
-  offerId?: string;
+  offerId?: string[];
   price: number;
+  shopId: string;
 }
 
 export const MenuDetails: FC = () => {
   const { shopId, menuId } = useParams();
   const [item, setItem] = useState<Item>();
-  const [items, setItems] = useState<Item[]>([]);
-  const [quantities, setQuantities] = useState<{ [key: string]: string }>({});
-  const [mainQuantity, setMainQuantity] = useState("1");
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    slidesToScroll: 2,
-    align: "start",
-  });
-  const [loading, setloading] = useState<Boolean>(false);
-
-  const carouselRef = useRef<HTMLDivElement>(null);
+  const [shopItems, setShopItems] = useState<Item[]>([]);
+  const [otherItems, setOtherItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const navigate = useNavigate();
   const { dispatch } = useCart();
 
   const fetchItemDetails = async () => {
     try {
-      setloading(true);
+      setLoading(true);
       const res = await axios.get(
         `${API}/api/v1/shop/${shopId}/menu/${menuId}`
       );
+      console.log("res for items: ", res.data);
+      console.log("Offer IDs in response:", res.data.offerId); // Add this log
+   
       setItem(res.data);
     } catch (error) {
       console.log("Failed to get the item details");
     } finally {
-      setloading(false);
+      setLoading(false);
     }
   };
 
-  const fetchItemsofShop = async () => {
+  const fetchShopItems = async () => {
     try {
-      setloading(true);
+      setLoading(true);
       const res = await axios.get(`${API}/api/v1/shop/${shopId}/menu`);
-      setItems(res.data[0].items);
+      console.log("here at shopitems",res.data);
+      console.log("Shop items response:", res.data[0].items);
+      setShopItems(res.data[0].items);
     } catch (error) {
       console.log("Failed to fetch the items of shop");
     } finally {
-      setloading(false);
+      setLoading(false);
     }
   };
 
-  const handleUpdateMainQuantity = (newQuantity: number) => {
-    if (newQuantity < 1) {
-      setMainQuantity("1");
-      return;
+  const fetchOtherItems = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API}/api/v1/shop/menu?limit=4&page=1`);
+      setOtherItems(res.data.items);
+    } catch (error) {
+      console.log("Failed to fetch other items");
+    } finally {
+      setLoading(false);
     }
-    setMainQuantity(newQuantity.toString());
   };
 
-  const handleMainQuantityChange = (value: string) => {
-    setMainQuantity(value);
-  };
-
-  const handleMainQuantityBlur = () => {
-    if (!mainQuantity) {
-      setMainQuantity("1");
-      return;
-    }
-
-    const newQuantity = parseInt(mainQuantity);
-    if (isNaN(newQuantity) || newQuantity < 1) {
-      setMainQuantity("1");
-      toast.error("Please enter a valid quantity");
-      return;
-    }
-
-    handleUpdateMainQuantity(newQuantity);
-  };
-
-  const handleQuantityChange = (itemId: string, value: string) => {
-    setQuantities({ ...quantities, [itemId]: value });
-  };
-
-  const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
-    if (newQuantity < 1) {
-      setQuantities((prev) => ({ ...prev, [itemId]: "1" }));
-      return;
-    }
-    setQuantities((prev) => ({ ...prev, [itemId]: newQuantity.toString() }));
-  };
-
-  const handleQuantityBlur = (itemId: string) => {
-    const inputValue = quantities[itemId];
-    if (!inputValue) {
-      setQuantities((prev) => ({
-        ...prev,
-        [itemId]: "1",
-      }));
-      return;
-    }
-
-    const newQuantity = parseInt(inputValue);
-    if (isNaN(newQuantity) || newQuantity < 1) {
-      setQuantities((prev) => ({
-        ...prev,
-        [itemId]: "1",
-      }));
-      toast.error("Please enter a valid quantity");
-      return;
-    }
-
-    handleUpdateQuantity(itemId, newQuantity);
-  };
-
-  const handleAddToCart = () => {
-    if (item) {
-      const quantity = parseInt(mainQuantity);
+  const handleAddToCart = (itemData: any, quantity: number) => {
+    try {
+      const fullItemData = item && (item._id === itemData._id || item._id === itemData.id) ? item : 
+                          shopItems.find(i => i._id === itemData._id || i._id === itemData.id) || itemData;
+      
+      console.log("Full item data:", fullItemData);
+      
+      const cartItem = {
+        _id: fullItemData.id || fullItemData._id, 
+        itemName: fullItemData.itemName || fullItemData.name,
+        price: fullItemData.price,
+        picture: fullItemData.picture || fullItemData.image,
+        offerId: Array.isArray(fullItemData.offerId) ? fullItemData.offerId : 
+                 Array.isArray(fullItemData.offerIds) ? fullItemData.offerIds : [], 
+        shopId: fullItemData.shopId || itemData.shopId,
+        itemDescription: fullItemData.itemDescription || "",
+        item: fullItemData.id || fullItemData._id, 
+        quantity: 1
+      };
+  
+      console.log("Cart item being added:", cartItem);
+  
       for (let i = 0; i < quantity; i++) {
         dispatch({
           type: "ADD_TO_CART",
-          payload: { ...item, shopId, item: item?._id || "" },
+          payload: cartItem
         });
       }
-
-      toast.success(`${quantity} x ${item.itemName} added to your cart`, {
+      
+      toast.success(`${quantity} x ${cartItem.itemName} added to your cart`, {
         duration: 2000,
       });
+    } catch (error) {
+      console.log("Failed to add item to cart", error);
+      toast.error("Failed to add item to cart");
     }
   };
 
-  const handleAddCarouselItemToCart = (carouselItem: Item) => {
-    const quantity = parseInt(quantities[carouselItem._id] || "1");
-    for (let i = 0; i < quantity; i++) {
-      dispatch({
-        type: "ADD_TO_CART",
-        payload: { ...carouselItem, shopId, item: item?._id || "" },
-      });
-    }
-
-    toast.success(`${quantity} x ${carouselItem.itemName} added to your cart`, {
-      duration: 2000,
-    });
-  };
-
-  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
-    const touch = e.touches[0];
-    (carouselRef.current as any).touchStartX = touch.clientX;
-  };
-
-  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
-    if (!(carouselRef.current as any).touchStartX) return;
-
-    const touch = e.touches[0];
-    const diffX = (carouselRef.current as any).touchStartX - touch.clientX;
-
-    if (Math.abs(diffX) > 50) {
-      if (diffX > 0) {
-        emblaApi?.scrollNext();
-      } else {
-        emblaApi?.scrollPrev();
-      }
-      (carouselRef.current as any).touchStartX = null;
-    }
-  };
-
-  const handleTouchEnd = () => {
-    (carouselRef.current as any).touchStartX = null;
-  };
-
-  const handleItemClickOnCarousel = (itemId: string): void => {
+  const handleItemClick = (itemId: string, shopId: string): void => {
     try {
       navigate(`/shop/${shopId}/menu/${itemId}`);
     } catch (error) {
       console.log("Failed to get item details");
+      toast.error("Failed to open item details");
     }
   };
 
   useEffect(() => {
+    console.log("haha: ", shopId, "and", menuId);
     fetchItemDetails();
-    fetchItemsofShop();
+    fetchShopItems();
+    fetchOtherItems();
   }, [menuId]);
 
   return (
     <div className="px-6 md:px-[200px]">
       <Navbar />
 
-      {/* Item Card */}
-      <div className="my-4">
+      {/* Item Banner */}
+      <div className="my-4 w-full">
         {loading ? (
           <SkeletonGrid count={1} />
         ) : (
-          <Card>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="w-full h-[300px]">
-                <div className="relative w-full h-full">
-                  <img
-                    src={item?.picture}
-                    alt={`${item?.itemName}`}
-                    className="absolute inset-0 w-full h-full object-cover rounded-tl-md rounded-bl-md"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col justify-center p-4">
-                <h1 className="font-extrabold text-4xl mb-4">
-                  {item?.itemName}
-                </h1>
-                <p className="line-clamp-3">{item?.itemDescription}</p>
-                <div className="flex items-center mt-4 space-x-4">
-                  <p className="text-lg font-bold">&#8377;{item?.price}</p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() =>
-                        handleUpdateMainQuantity(parseInt(mainQuantity) - 1)
-                      }
-                    >
-                      <FaMinus className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      type="text"
-                      value={mainQuantity}
-                      onChange={(e) => handleMainQuantityChange(e.target.value)}
-                      onBlur={handleMainQuantityBlur}
-                      className="w-16 text-center"
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() =>
-                        handleUpdateMainQuantity(parseInt(mainQuantity) + 1)
-                      }
-                    >
-                      <FaPlus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex justify-start mt-4">
-                  <Button onClick={handleAddToCart}>Add to Cart</Button>
-                </div>
-              </div>
-            </div>
-          </Card>
+          item && (
+            <ItemBanner
+              id={item._id}
+              shopId={shopId || ""}
+              description={item.itemDescription}
+              name={item.itemName}
+              image={item.picture}
+              price={item.price}
+              currency="₹"
+              onAddToCart={handleAddToCart}
+            />
+          )
         )}
       </div>
 
-      {/* Other Items Carousel */}
-      <h1 className="font-extrabold text-black mt-6 mb-3 text-2xl">
-        Other Items
-      </h1>
-      <div
-        className="w-full p-5"
-        ref={carouselRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        <Carousel ref={emblaRef} className="w-full">
-          <CarouselContent className="-ml-2 md:-ml-4">
-            {items.map((item) =>
-              loading ? (
-                <SkeletonGrid count={1} />
-              ) : (
-                <CarouselItem
-                  key={item?._id}
-                  className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/2"
-                >
-                  <Card className="cursor-pointer w-full h-full flex flex-col">
-                    <div
-                      className="w-full h-48 relative"
-                      onClick={() => handleItemClickOnCarousel(item._id)}
-                    >
-                      <img
-                        src={item?.picture}
-                        alt={item?.itemName}
-                        className="absolute inset-0 w-full h-full object-cover rounded-tl-md rounded-tr-md"
-                      />
-                    </div>
-                    <CardHeader className="flex-none">
-                      <CardTitle className="text-xl line-clamp-1">
-                        {item?.itemName}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-grow">
-                      <p className="text-sm line-clamp-2">
-                        {item?.itemDescription}
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex-none flex justify-between items-center flex-wrap gap-2">
-                      <p className="font-bold">&#8377;{item?.price}</p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUpdateQuantity(
-                              item._id,
-                              parseInt(quantities[item._id] || "1") - 1
-                            );
-                          }}
-                        >
-                          <FaMinus className="h-4 w-4" />
-                        </Button>
-                        <Input
-                          type="text"
-                          value={quantities[item._id] || "1"}
-                          onChange={(e) =>
-                            handleQuantityChange(item._id, e.target.value)
-                          }
-                          onBlur={() => handleQuantityBlur(item._id)}
-                          className="w-16 text-center"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUpdateQuantity(
-                              item._id,
-                              parseInt(quantities[item._id] || "1") + 1
-                            );
-                          }}
-                        >
-                          <FaPlus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddCarouselItemToCart(item);
-                        }}
-                      >
-                        Add to Cart
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                </CarouselItem>
-              )
-            )}
-          </CarouselContent>
-          {items.length > 2 ? (
-            <>
-              <CarouselPrevious />
-              <CarouselNext />
-            </>
-          ) : null}
-        </Carousel>
+      {/* Shop Items Section */}
+      <div className="mt-8">
+        <div className="flex justify-between">
+          <h1 className="font-extrabold text-black mb-4 text-2xl">
+            More from this Shop
+          </h1>
+          <Button
+            className="cursor-pointer"
+            onClick={() => navigate(`/shop/${shopId}`)}
+          >
+            View all
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 w-full gap-4">
+          {loading ? (
+            <SkeletonGrid count={4} />
+          ) : (
+            shopItems
+              .filter(item => item._id !== menuId)
+              .slice(0, 4)
+              .map((item) => (
+                <ItemCard
+                  key={item._id}
+                  id={item._id}
+                  shopId={shopId || ""}
+                  name={item.itemName}
+                  image={item.picture}
+                  price={item.price}
+                  currency="₹"
+                  onItemClick={handleItemClick}
+                  onAddToCart={handleAddToCart}
+                />
+              ))
+          )}
+        </div>
+      </div>
+
+      {/* Other Items Section */}
+      <div className="mt-8 mb-8">
+        <div className="flex justify-between">
+          <h1 className="font-extrabold text-black mb-4 text-2xl">
+            You may also like
+          </h1>
+          <Button
+            className="cursor-pointer"
+            onClick={() => navigate("/items")}
+          >
+            View more
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 w-full gap-4">
+          {loading ? (
+            <SkeletonGrid count={4} />
+          ) : (
+            otherItems
+              .filter(item => item._id !== menuId && item.shopId !== shopId)
+              .slice(0, 4)
+              .map((item) => (
+                <ItemCard
+                  key={item._id}
+                  id={item._id}
+                  shopId={item.shopId}
+                  name={item.itemName}
+                  image={item.picture}
+                  price={item.price}
+                  currency="₹"
+                  onItemClick={handleItemClick}
+                  onAddToCart={handleAddToCart}
+                />
+              ))
+          )}
+        </div>
       </div>
     </div>
   );

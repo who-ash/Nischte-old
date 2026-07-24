@@ -15,9 +15,11 @@ export const RegisterShop: FC = () => {
   const { user } = useUser();
   const { getToken } = useAuth();
   const userId = user?.id;
+  const userphoneNumber = user?.phoneNumbers[0].phoneNumber;
   if(!userId) {
     throw new Error("failed to get the user id");
   }
+
 
   // console.log("user emails", user?.primaryEmailAddress?.emailAddress);
 
@@ -33,6 +35,11 @@ export const RegisterShop: FC = () => {
     if (ownerId) {
       formData.append("ownerId", ownerId);
     }
+
+    if (userphoneNumber) {
+      formData.append("contactNo", userphoneNumber);
+    }
+
 
     if (email) {
       formData.append("email", email);
@@ -72,15 +79,15 @@ export const RegisterShop: FC = () => {
   };
 
 
-  useEffect(() => {
-    console.log("userId: ", userId);
-  }, []);
+  // useEffect(() => {
+  //   console.log("userId: ", );
+  // }, []);
 
   return (
     <>
-      <div className="px-6 md:px-[200px] flex flex-col ">
+      <div className="px-6 md:px-[200px] flex flex-col min-h-screen">
         <Navbar />
-        <div className="flex-grow">
+        <div className="flex-grow flex items-center justify-center">
           <div className="flex justify-center items-center">
             <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
               <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">

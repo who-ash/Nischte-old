@@ -28,6 +28,7 @@ import offerRouter from "../src/routes/offer.route.js";
 import supportRouter from "../src/routes/support.route.js";
 import paymentRouter from "../src/routes/payment.route.js";
 import userRouter from "../src/routes/user.route.js"
+import utilsRouter from "../src/routes/utils.route.js"
 
 app.use("/api/v1/shop", shopMenuRouter);
 app.use("/api/v1/shop", shopRouter);
@@ -36,5 +37,6 @@ app.use("/api/v1/order", orderRouter);
 app.use("/api/v1/offer", offerRouter);
 app.use("/api/v1/payment", paymentRouter);
 app.use("/api/v1/user", userRouter);
+app.use("/api/v1/u", utilsRouter)
 
 export default app;
